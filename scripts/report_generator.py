@@ -3,72 +3,108 @@ from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from openai import OpenAI
 import os
+import json
 
-client = OpenAI()
+# Initialize client with error handling
+try:
+    client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+except Exception as e:
+    print(f"Failed to initialize OpenAI client: {str(e)}")
+    exit(1)
 
-def analyze_tender_content(text):
-    """Extract key sections using AI"""
-    response = client.chat.completions.create(
-        model="gpt-4-turbo",
-        messages=[
-            {"role": "system", "content": """You are a tender analysis expert. Extract:
-            1. PROJECT_TITLE
-            2. KEY_REQUIREMENTS (bulleted list)
-            3. TECHNICAL_SPECS (table-ready format)
-            4. METHODOLOGY_REQUIREMENTS (focus on technical processes)"""},
-            {"role": "user", "content": text}
-        ],
-        temperature=0.3
-    )
-    return response.choices[0].message.content
+def parse_ai_response(text):
+    """Convert AI response to structured data with error handling"""
+    try:
+        return json.loads(text)  # For JSON responses
+    except json.JSONDecodeError:
+        # Fallback parsing for text responses
+        sections = {}
+        current_section = None
+        for line in text.split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                sections[key.strip()] = value.strip()
+        return sections
 
-def create_technical_doc(analysis, filename):
+def generate_report(text):
+    """Generate report content with robust error handling"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            response_format={ "type": "json_object" },
+            messages=[
+                {
+                    "role": "system",
+                    "content": """You are a tender analysis expert. Return JSON with:
+                    {
+                        "project_title": str,
+                        "key_requirements": [str],
+                        "technical_specs": {"requirement": "solution"},
+                        "methodology": [str]
+                    }"""
+                },
+                {
+                    "role": "user", 
+                    "content": text[:20000]  # Safe token limit
+                }
+            ],
+            temperature=0.3
+        )
+        return parse_ai_response(response.choices[0].message.content)
+    except Exception as e:
+        print(f"AI generation failed: {str(e)}")
+        return None
+
+def create_word_doc(analysis, filename):
+    """Create formatted Word document"""
     doc = Document()
     
     # Cover Page
-    doc.add_heading('TECHNICAL PROPOSAL', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
-    doc.add_paragraph().add_run("For: " + analysis.get("PROJECT_TITLE", "")).bold = True
+    title = doc.add_paragraph()
+    title_run = title.add_run("TECHNICAL PROPOSAL")
+    title_run.font.size = Pt(24)
+    title_run.bold = True
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    doc.add_paragraph(f"Project: {analysis.get('project_title', '')}")
     doc.add_page_break()
     
-    # Methodology Section (Emphasized)
+    # Methodology Section
     doc.add_heading('Technical Methodology', 1)
-    for req in analysis.get("METHODOLOGY_REQUIREMENTS", "").split('\n'):
-        if req.strip():
-            p = doc.add_paragraph(style='ListBullet')
-            p.add_run(req.strip()).bold = True
+    for item in analysis.get('methodology', []):
+        doc.add_paragraph(item, style='ListBullet')
     
-    # Technical Specs Table
+    # Compliance Table
     doc.add_heading('Compliance Matrix', 1)
     table = doc.add_table(rows=1, cols=3)
     table.style = 'LightShading-Accent1'
-    table.cell(0,0).text = "Requirement"
-    table.cell(0,1).text = "Our Approach"
-    table.cell(0,2).text = "Compliance"
+    hdr = table.rows[0].cells
+    hdr[0].text = "Requirement"
+    hdr[1].text = "Solution"
+    hdr[2].text = "Standard"
     
-    # Save
-    doc.save(f"outputs/{filename}_report.docx")
+    for req, sol in analysis.get('technical_specs', {}).items():
+        row = table.add_row().cells
+        row[0].text = req
+        row[1].text = sol
+        row[2].text = "AWWA C150" if "pipe" in req.lower() else "ISO 9001"
+    
+    # Save document
+    output_path = f"outputs/{filename}_report.docx"
+    doc.save(output_path)
+    print(f"Report saved to {output_path}")
 
-def generate_reports():
+def main():
+    os.makedirs("outputs", exist_ok=True)
+    
     for file in os.listdir("outputs"):
         if file.endswith("_cleaned.txt"):
             with open(f"outputs/{file}", "r") as f:
                 text = f.read()
             
-            analysis = analyze_tender_content(text)
-            create_technical_doc(parse_ai_response(analysis), 
-                               os.path.splitext(file)[0])
-
-def parse_ai_response(text):
-    """Convert AI response to structured dict"""
-    sections = {}
-    current_section = None
-    for line in text.split('\n'):
-        if line.startswith(('1.', '2.', '3.', '4.')):
-            current_section = line.split('.')[1].strip().upper()
-            sections[current_section] = []
-        elif current_section and line.strip():
-            sections[current_section].append(line.strip())
-    return sections
+            analysis = generate_report(text)
+            if analysis:
+                create_word_doc(analysis, os.path.splitext(file)[0])
 
 if __name__ == "__main__":
-    generate_reports()
+    main()

@@ -22,9 +22,9 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr poppler-utils libtesseract-dev
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          sudo apt-get install -y tesseract-ocr poppler-utils
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt --no-cache-dir
           
       - name: Process documents
         env:

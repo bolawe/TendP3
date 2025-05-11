@@ -1,0 +1,33 @@
+name: Tender Report Automation
+on:
+  push:
+    paths:
+      - 'inputs/**'
+  schedule:
+    - cron: '0 18 * * 1-5'  # Weekdays at 6 PM
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr poppler-utils
+          pip install -r requirements.txt
+          
+      - name: Process documents
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/ocr_processor.py
+          python scripts/report_generator.py
+          
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tender-reports
+          path: outputs/

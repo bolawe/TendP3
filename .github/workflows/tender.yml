@@ -13,18 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y tesseract-ocr poppler-utils
-          pip install -r requirements.txt
-          
+         
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr poppler-utils
+          sudo apt-get install -y tesseract-ocr poppler-utils libtesseract-dev
           python -m pip install --upgrade pip
-          pip install -r requirements.txt --no-cache-dir
+          pip install -r requirements.txt --force-reinstall
           
       - name: Process documents
         env:

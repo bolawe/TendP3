@@ -1,6 +1,12 @@
-openai==1.12.0
-python-docx==0.8.11
-pytesseract==0.3.10
-pdf2image==1.16.3
-pillow==10.1.0
-tqdm==4.66.1  # For progress bars
+Run python scripts/ocr_processor.py
+  python scripts/ocr_processor.py
+  python scripts/report_generator.py
+  shell: /usr/bin/bash -e {0}
+  env:
+    OPENAI_API_KEY: ***
+  
+Processing B4.pdf...
+Processing B2.pdf...
+Processing B3.pdf...
+Failed to initialize OpenAI client: Client.__init__() got an unexpected keyword argument 'proxies'
+Error: Process completed with exit code 1.

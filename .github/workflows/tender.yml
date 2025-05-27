@@ -3,8 +3,8 @@ on:
   push:
     paths:
       - 'inputs/**'
-  schedule:
-    - cron: '0 18 * * 1-5'  # Weekdays at 6 PM
+ ## schedule:
+   ## - cron: '0 18 * * 1-5'  # Weekdays at 6 PM
 
 jobs:
   process:
